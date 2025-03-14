@@ -3,12 +3,62 @@ import { config } from './config'
 import { logger } from './utils/logger'
 import cors from 'cors'
 import { loadProofs, saveProofs } from '../db/helpers'
+import WebSocket from 'ws'
+import http from 'http'
 
 const app = express()
 app.use(cors())
 app.use(express.json())
 
-app.get('/proof-params/:id', (req, res) => {
+const wss = new WebSocket.Server({ noServer: true })
+
+const clients = new Map()
+
+wss.on('connection', (ws) => {
+	let address: string | null = null
+
+	ws.send(
+		JSON.stringify({
+			message: `You are connected to the WebSocket server!`,
+		})
+	)
+	logger.info('New WebSocket connection, waiting for address...')
+
+	ws.on('message', (message: string) => {
+		try {
+			const parsedMessage = JSON.parse(message)
+
+			if (parsedMessage.type === 'SET_ADDRESS' && parsedMessage.address) {
+				address = parsedMessage.address
+				clients.set(address, ws)
+				logger.info(`New WebSocket connection from user@${address}`)
+
+				ws.send(
+					JSON.stringify({
+						type: 'SET_SESSION_ID',
+						message: `You are connected! Your address is ${address}`,
+						sessionId: address,
+					})
+				)
+			} else {
+				logger.info(`Unknown message type: ${message}`)
+			}
+		} catch (err) {
+			logger.error('Error parsing message:', err)
+		}
+	})
+
+	ws.on('close', () => {
+		if (address) {
+			clients.delete(address)
+		}
+		logger.info(`User with address ${address} has disconnected`)
+	})
+})
+
+const server = http.createServer(app)
+
+app.get('/api/proof-params/:id', (req, res) => {
 	const { id } = req.params
 	res.json({
 		data: {
@@ -17,7 +67,8 @@ app.get('/proof-params/:id', (req, res) => {
 			attributes: {
 				birth_date_lower_bound: '0x303030303030',
 				birth_date_upper_bound: '0x303730333133',
-				callback_url: `${config.API_URL}/callback/${id}`,
+				// TODO: Replace with the actual ngrok URL that maps to the POST endpoint with the corresponding ID (EVM address)
+				callback_url: `http://localhost:5000/api/callback/${id}`,
 				citizenship_mask: '0x554B52',
 				event_data:
 					'0x2c53003793370f2bdb1f8e1fe5d1dca45ab435f8cce48da8371f42d9c96d60',
@@ -36,7 +87,7 @@ app.get('/proof-params/:id', (req, res) => {
 	})
 })
 
-app.post('/callback/:id', (req, res) => {
+app.post('/api/callback/:id', (req, res) => {
 	const { id } = req.params
 	const proofs = loadProofs()
 
@@ -74,10 +125,23 @@ app.post('/callback/:id', (req, res) => {
 
 	saveProofs(proofs)
 
+	const ws = clients.get(id)
+
+	if (ws) {
+		ws.send(
+			JSON.stringify({
+				type: 'PROOF_SAVED',
+				message: `Your proof with ID ${id} has been successfully saved!`,
+			})
+		)
+	} else {
+		logger.info(`User with address ${id} not connected via WebSocket`)
+	}
+
 	res.status(201).json({})
 })
 
-app.get('/proof/:id', (req, res) => {
+app.get('/api/proofs/:id', (req, res) => {
 	const { id } = req.params
 	const proofs = loadProofs()
 
@@ -105,15 +169,12 @@ app.get('/proof/:id', (req, res) => {
 	})
 })
 
-async function bootstrap() {
-	try {
-		app.listen(config.PORT, () => {
-			logger.info(`Server started at ${config.PORT}`)
-		})
-	} catch (error) {
-		logger.error(`Server started at ${config.PORT}`)
-		process.exit(1)
-	}
-}
+server.on('upgrade', (request, socket, head) => {
+	wss.handleUpgrade(request, socket, head, (ws) => {
+		wss.emit('connection', ws, request)
+	})
+})
 
-bootstrap()
+server.listen(config.PORT, () => {
+	logger.info(`Server started at ${config.PORT}`)
+})
