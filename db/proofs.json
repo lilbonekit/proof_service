@@ -1,12 +1,1 @@
-{
-  "0x228": {
-    "id": "0x228",
-    "date": 1741956813776,
-    "proof": "mocked-proof-for-12345"
-  },
-  "0xPisun": {
-    "id": "0xPisun",
-    "date": 1741956822227,
-    "proof": "mocked-proof-for-12345"
-  }
-}
+{}

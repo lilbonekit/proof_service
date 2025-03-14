@@ -5,6 +5,7 @@ import cors from 'cors'
 import { loadProofs, saveProofs } from '../db/helpers'
 import WebSocket from 'ws'
 import http from 'http'
+import { WebSocketEvent } from './types'
 
 const app = express()
 app.use(cors())
@@ -28,20 +29,26 @@ wss.on('connection', (ws) => {
 		try {
 			const parsedMessage = JSON.parse(message)
 
-			if (parsedMessage.type === 'SET_ADDRESS' && parsedMessage.address) {
-				address = parsedMessage.address
-				clients.set(address, ws)
-				logger.info(`New WebSocket connection from user@${address}`)
+			switch (parsedMessage.type) {
+				case WebSocketEvent.SET_ADDRESS:
+					if (parsedMessage.address) {
+						address = parsedMessage.address
+						clients.set(address, ws)
+						logger.info(`New WebSocket connection from user@${address}`)
 
-				ws.send(
-					JSON.stringify({
-						type: 'SET_SESSION_ID',
-						message: `You are connected! Your address is ${address}`,
-						sessionId: address,
-					})
-				)
-			} else {
-				logger.info(`Unknown message type: ${message}`)
+						ws.send(
+							JSON.stringify({
+								type: WebSocketEvent.SET_SESSION_ID,
+								message: `You are connected! Your address is ${address}`,
+								sessionId: address,
+							})
+						)
+					}
+					break
+
+				default:
+					logger.info(`Unknown message type: ${message}`)
+					break
 			}
 		} catch (err) {
 			logger.error('Error parsing message:', err)
@@ -67,8 +74,8 @@ app.get('/api/proof-params/:id', (req, res) => {
 			attributes: {
 				birth_date_lower_bound: '0x303030303030',
 				birth_date_upper_bound: '0x303730333133',
-				// TODO: Replace with the actual ngrok URL that maps to the POST endpoint with the corresponding ID (EVM address)
-				callback_url: `http://localhost:5000/api/callback/${id}`,
+				// TODO: Replace with ngrok server url
+				callback_url: `http://localhost:5000/api/proofs/${id}`,
 				citizenship_mask: '0x554B52',
 				event_data:
 					'0x2c53003793370f2bdb1f8e1fe5d1dca45ab435f8cce48da8371f42d9c96d60',
@@ -87,7 +94,7 @@ app.get('/api/proof-params/:id', (req, res) => {
 	})
 })
 
-app.post('/api/callback/:id', (req, res) => {
+app.post('/api/proofs/:id', (req, res) => {
 	const { id } = req.params
 	const proofs = loadProofs()
 
@@ -130,7 +137,7 @@ app.post('/api/callback/:id', (req, res) => {
 	if (ws) {
 		ws.send(
 			JSON.stringify({
-				type: 'PROOF_SAVED',
+				type: WebSocketEvent.PROOF_SAVED,
 				message: `Your proof with ID ${id} has been successfully saved!`,
 			})
 		)
