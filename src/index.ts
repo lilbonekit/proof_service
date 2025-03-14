@@ -32,7 +32,7 @@ wss.on('connection', (ws) => {
 			switch (parsedMessage.type) {
 				case WebSocketEvent.SET_ADDRESS:
 					if (parsedMessage.address) {
-						address = parsedMessage.address
+						address = parsedMessage.address.toLowerCase()
 						clients.set(address, ws)
 						logger.info(`New WebSocket connection from user@${address}`)
 
@@ -66,7 +66,9 @@ wss.on('connection', (ws) => {
 const server = http.createServer(app)
 
 app.get('/api/proof-params/:id', (req, res) => {
-	const { id } = req.params
+	const { id: _id } = req.params
+	const id = _id.toLowerCase()
+
 	res.json({
 		data: {
 			id,
@@ -96,7 +98,8 @@ app.get('/api/proof-params/:id', (req, res) => {
 })
 
 app.post('/api/proofs/:id', (req, res) => {
-	const { id } = req.params
+	const { id: _id } = req.params
+	const id = _id.toLowerCase()
 	const proofs = loadProofs()
 
 	const { data } = req.body
