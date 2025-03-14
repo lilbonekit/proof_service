@@ -67,7 +67,18 @@ const server = http.createServer(app)
 
 app.get('/api/proof-params/:id', (req, res) => {
 	const { id: _id } = req.params
-	const id = _id.toLowerCase()
+	const id = _id.toLowerCase().trim()
+
+	if (!id) {
+		return res.status(400).json({
+			errors: [
+				{
+					title: 'Invalid Data',
+					detail: 'id is required',
+				},
+			],
+		})
+	}
 
 	res.json({
 		data: {
@@ -99,13 +110,51 @@ app.get('/api/proof-params/:id', (req, res) => {
 
 app.post('/api/proofs/:id', (req, res) => {
 	const { id: _id } = req.params
-	const id = _id.toLowerCase()
+	const id = _id.toLowerCase().trim()
+
+	if (!id) {
+		return res.status(400).json({
+			errors: [
+				{
+					title: 'Invalid Data',
+					detail: 'id is required',
+				},
+			],
+		})
+	}
+
+	const ws = clients.get(id)
+
+	if (ws) {
+		ws.send(
+			JSON.stringify({
+				type: WebSocketEvent.PROOF_GENERATING,
+				message: `Your proof with ID ${id} is generating...`,
+			})
+		)
+	} else {
+		logger.info(`User with address ${id} not connected via WebSocket`)
+	}
+
 	const proofs = loadProofs()
 
 	const { data } = req.body
 	console.log(data, data)
 
 	if (!data || !data.attributes.proof) {
+		if (ws) {
+			// fake delay to show process status on client
+			setTimeout(() => {
+				ws.send(
+					JSON.stringify({
+						type: WebSocketEvent.PROOF_ERROR,
+						message: `Error generation proof`,
+					})
+				)
+			}, 2_000)
+		} else {
+			logger.info(`User with address ${id} not connected via WebSocket`)
+		}
 		return res.status(400).json({
 			errors: [
 				{
@@ -118,6 +167,19 @@ app.post('/api/proofs/:id', (req, res) => {
 	}
 
 	if (proofs[id]) {
+		if (ws) {
+			// fake delay to show process status on client
+			setTimeout(() => {
+				ws.send(
+					JSON.stringify({
+						type: WebSocketEvent.PROOF_ERROR,
+						message: `Error generation proof`,
+					})
+				)
+			}, 2_000)
+		} else {
+			logger.info(`User with address ${id} not connected via WebSocket`)
+		}
 		return res.status(400).json({
 			errors: [
 				{
@@ -136,15 +198,16 @@ app.post('/api/proofs/:id', (req, res) => {
 
 	saveProof(proofs)
 
-	const ws = clients.get(id)
-
 	if (ws) {
-		ws.send(
-			JSON.stringify({
-				type: WebSocketEvent.PROOF_SAVED,
-				message: `Your proof with ID ${id} has been successfully saved!`,
-			})
-		)
+		// fake delay to show process status on client
+		setTimeout(() => {
+			ws.send(
+				JSON.stringify({
+					type: WebSocketEvent.PROOF_SAVED,
+					message: `Your proof with ID ${id} has been successfully saved!`,
+				})
+			)
+		}, 5_000)
 	} else {
 		logger.info(`User with address ${id} not connected via WebSocket`)
 	}
