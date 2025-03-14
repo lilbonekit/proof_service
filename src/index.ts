@@ -2,7 +2,7 @@ import express from 'express'
 import { config } from './config'
 import { logger } from './utils/logger'
 import cors from 'cors'
-import { loadProofs, saveProofs } from '../db/helpers'
+import { loadProofs, saveProof } from '../db/helpers'
 import WebSocket from 'ws'
 import http from 'http'
 import { WebSocketEvent } from './types'
@@ -134,7 +134,7 @@ app.post('/api/proofs/:id', (req, res) => {
 		proof: data.attributes.proof,
 	}
 
-	saveProofs(proofs)
+	saveProof(proofs)
 
 	const ws = clients.get(id)
 

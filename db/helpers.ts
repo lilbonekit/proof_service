@@ -11,6 +11,6 @@ export const loadProofs = () => {
 	return {}
 }
 
-export const saveProofs = (proofs: Record<string, any>) => {
+export const saveProof = (proofs: Record<string, any>) => {
 	fs.writeFileSync(proofFilePath, JSON.stringify(proofs, null, 2))
 }
