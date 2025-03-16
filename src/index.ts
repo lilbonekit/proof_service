@@ -80,6 +80,19 @@ app.get('/api/proof-params/:id', (req, res) => {
 		})
 	}
 
+	const ws = clients.get(id)
+
+	if (ws) {
+		ws.send(
+			JSON.stringify({
+				type: WebSocketEvent.PROOF_GENERATING,
+				message: `Your proof with ID ${id} is generating...`,
+			})
+		)
+	} else {
+		logger.info(`User with address ${id} not connected via WebSocket`)
+	}
+
 	res.json({
 		data: {
 			id,
@@ -128,7 +141,7 @@ app.post('/api/proofs/:id', (req, res) => {
 	if (ws) {
 		ws.send(
 			JSON.stringify({
-				type: WebSocketEvent.PROOF_GENERATING,
+				type: WebSocketEvent.PROOF_SAVING,
 				message: `Your proof with ID ${id} is generating...`,
 			})
 		)
